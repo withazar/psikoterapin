@@ -25,7 +25,9 @@ import {
   MessageSquare,
   Send,
 } from "lucide-react";
-import { getTumPsikologlar, getRandevular } from "@/lib/localData";
+import { getTumPsikologlar } from "@/lib/localData";
+import { getPsikologYorumlari, createYorum, getPsikologRandevulari } from "@/lib/supabase-queries";
+
 import {
   formatPara,
   formatTarih,
@@ -578,47 +580,61 @@ function YorumBolumu({ psikologId, psikologAdi }: { psikologId: string; psikolog
   const [yorumYapiliyor, setYorumYapiliyor] = useState(false);
   const [yorumYapabilir, setYorumYapabilir] = useState(false);
   const [yorumYapildi, setYorumYapildi] = useState(false);
+  const [yukleniyor, setYukleniyor] = useState(true);
 
   useEffect(() => {
-    // Yorumları yükle
-    const { getPsikologYorumlari, getRandevular } = require("@/lib/localData");
-    const psikologYorumlari = getPsikologYorumlari(psikologId);
-    setYorumlar(psikologYorumlari);
-
-    // Kullanıcı bu psikologdan terapi almış mı kontrol et
-    if (user) {
-      const randevular = getRandevular();
-      const tamamlananRandevu = randevular.find(
-        (r: any) => r.psikolog_id === psikologId && r.danisan_id === user.id && r.durum === "tamamlandi"
-      );
-      setYorumYapabilir(!!tamamlananRandevu);
-
-      // Daha önce yorum yapmış mı kontrol et
-      const oncekiYorum = psikologYorumlari.find((y: any) => y.danisan_id === user.id);
-      setYorumYapildi(!!oncekiYorum);
-    }
+    loadYorumlar();
   }, [psikologId, user]);
 
-  const handleYorumGonder = () => {
+  const loadYorumlar = async () => {
+    setYukleniyor(true);
+    try {
+      // Supabase'den yorumları yükle
+      const psikologYorumlari = await getPsikologYorumlari(psikologId);
+      setYorumlar(psikologYorumlari);
+
+      // Kullanıcı bu psikologdan terapi almış mı kontrol et
+      if (user) {
+        const randevular = await getPsikologRandevulari(psikologId);
+        const tamamlananRandevu = randevular.find(
+          (r: any) => r.danisan_id === user.id && r.durum === "tamamlandi"
+        );
+        setYorumYapabilir(!!tamamlananRandevu);
+
+        // Daha önce yorum yapmış mı kontrol et
+        const oncekiYorum = psikologYorumlari.find((y: any) => y.danisan_id === user.id);
+        setYorumYapildi(!!oncekiYorum);
+      }
+    } catch (err) {
+      console.error("Yorumlar yüklenirken hata:", err);
+    }
+    setYukleniyor(false);
+  };
+
+  const handleYorumGonder = async () => {
     if (!user || !yorumMetni.trim()) return;
     
-    const { yorumEkle } = require("@/lib/localData");
-    yorumEkle({
-      psikolog_id: psikologId,
-      danisan_id: user.id,
-      danisan_adi: `${user.ad} ${user.soyad}`,
-      puan: puan,
-      yorum: yorumMetni.trim(),
-    });
+    try {
+      await createYorum({
+        psikolog_id: psikologId,
+        danisan_id: user.id,
+        danisan_adi: `${user.ad} ${user.soyad}`,
+        puan: puan,
+        yorum: yorumMetni.trim(),
+        onayli: true,
+      });
 
-    // Yorumları yeniden yükle
-    const { getPsikologYorumlari } = require("@/lib/localData");
-    setYorumlar(getPsikologYorumlari(psikologId));
-    setYorumMetni("");
-    setPuan(5);
-    setYorumYapildi(true);
-    setYorumYapiliyor(false);
+      // Yorumları yeniden yükle
+      await loadYorumlar();
+      setYorumMetni("");
+      setPuan(5);
+      setYorumYapildi(true);
+      setYorumYapiliyor(false);
+    } catch (err) {
+      console.error("Yorum gönderilirken hata:", err);
+    }
   };
+
 
   return (
     <div className="card">
