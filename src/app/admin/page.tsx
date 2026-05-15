@@ -29,32 +29,15 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useRandevu } from "@/context/RandevuContext";
-import { getTumPsikologlar, getPsikologProfilleri, savePsikologProfilleri, getOnayBekleyenler, saveOnayBekleyenler, getOdemeler, saveOdemeler } from "@/lib/localData";
 import { formatTarih, formatPara, UZMANLIK_ALANLARI } from "@/lib/utils";
+import {
+  getPsikologProfilleri,
+  getOnayBekleyenler,
+  updateOnayDurumu,
+  upsertPsikologProfili,
+} from "@/lib/supabase-queries";
 
 type TabId = "onay" | "psikologlar" | "odemeler" | "raporlar";
-
-interface BekleyenPsikolog {
-  id: string;
-  kullanici_id: string;
-  ad: string;
-  email: string;
-  telefon: string;
-  alan: string;
-  basvuru: string;
-  durum: "beklemede" | "onaylandi" | "reddedildi";
-  profil: any;
-}
-
-interface Odeme {
-  id: number;
-  psikolog: string;
-  paket: string;
-  tutar: string;
-  tarih: string;
-  durum: "basarili" | "basarisiz";
-}
 
 export default function AdminPage() {
   const router = useRouter();
@@ -87,9 +70,24 @@ export default function AdminPage() {
 function AdminPanel() {
   const [activeTab, setActiveTab] = useState<TabId>("onay");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [tumPsikologlar, setTumPsikologlar] = useState<any[]>([]);
+  const [bekleyenler, setBekleyenler] = useState<any[]>([]);
 
-  const tumPsikologlar = getTumPsikologlar();
-  const bekleyenler = getOnayBekleyenler();
+  useEffect(() => {
+    loadData();
+  }, [refreshKey]);
+
+  const loadData = async () => {
+    try {
+      const psikologlar = await getPsikologProfilleri();
+      setTumPsikologlar(psikologlar);
+      const bekleyen = await getOnayBekleyenler();
+      setBekleyenler(bekleyen);
+    } catch (err) {
+      console.error("Veri yüklenirken hata:", err);
+    }
+  };
+
   const bekleyenSayisi = bekleyenler.filter((b: any) => b.durum === "beklemede").length;
 
   const tabs = [
@@ -186,7 +184,7 @@ function AdminPanel() {
 }
 
 function OnayBekleyenler({ onRefresh }: { onRefresh: () => void }) {
-  const [bekleyenler, setBekleyenler] = useState<BekleyenPsikolog[]>([]);
+  const [bekleyenler, setBekleyenler] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
@@ -194,86 +192,46 @@ function OnayBekleyenler({ onRefresh }: { onRefresh: () => void }) {
     loadData();
   }, []);
 
-  const loadData = () => {
-    // localStorage'dan onay bekleyenleri al
-    let data = getOnayBekleyenler();
-    
-    // Eğer localStorage boşsa, psikolog profillerinden onay bekleyenleri oluştur
-    if (data.length === 0) {
-      const profiller = getPsikologProfilleri();
-      // Henüz onaylanmamış profilleri onay bekleyenlere ekle
-      const onaylanmamis = profiller.filter((p: any) => !p.admin_onaylandi);
-      if (onaylanmamis.length > 0) {
-        data = onaylanmamis.map((p: any, i: number) => ({
-          id: `bekleyen-${i}`,
-          kullanici_id: p.kullanici_id,
-          ad: p.unvan || "İsimsiz Psikolog",
-          email: p.email || "",
-          telefon: p.telefon || "",
-          alan: Array.isArray(p.uzmanlik_alani) && p.uzmanlik_alani.length > 0
-            ? (UZMANLIK_ALANLARI[p.uzmanlik_alani[0]] || p.uzmanlik_alani[0])
-            : "Psikoloji",
-          basvuru: p.created_at ? new Date(p.created_at).toLocaleDateString("tr-TR") : new Date().toLocaleDateString("tr-TR"),
-          durum: "beklemede" as const,
-          profil: p,
-        }));
-        saveOnayBekleyenler(data);
-      }
+  const loadData = async () => {
+    try {
+      const data = await getOnayBekleyenler();
+      setBekleyenler(data);
+    } catch (err) {
+      console.error("Onay bekleyenler yüklenirken hata:", err);
     }
-    
-    setBekleyenler(data);
   };
 
-  const handleOnayla = (id: string) => {
-    const guncel = bekleyenler.map(b => {
-      if (b.id === id) {
-        // Profili de güncelle - admin_onaylandi ekle
-        const profiller = getPsikologProfilleri();
-        const profilIdx = profiller.findIndex((p: any) => p.kullanici_id === b.kullanici_id);
-        if (profilIdx !== -1) {
-          profiller[profilIdx].admin_onaylandi = true;
-          profiller[profilIdx].aktif = true;
-          savePsikologProfilleri(profiller);
-        }
-        return { ...b, durum: "onaylandi" as const };
-      }
-      return b;
-    });
-    setBekleyenler(guncel);
-    saveOnayBekleyenler(guncel);
-    setSuccessMsg(`${bekleyenler.find(b => b.id === id)?.ad} başarıyla onaylandı!`);
-    setTimeout(() => setSuccessMsg(""), 3000);
-    onRefresh();
+  const handleOnayla = async (id: string) => {
+    try {
+      await updateOnayDurumu(id, "onaylandi");
+      setSuccessMsg(`Psikolog başarıyla onaylandı!`);
+      setTimeout(() => setSuccessMsg(""), 3000);
+      loadData();
+      onRefresh();
+    } catch (err) {
+      console.error("Onaylama hatası:", err);
+    }
   };
 
-  const handleReddet = (id: string) => {
-    const guncel = bekleyenler.map(b => {
-      if (b.id === id) {
-        const profiller = getPsikologProfilleri();
-        const profilIdx = profiller.findIndex((p: any) => p.kullanici_id === b.kullanici_id);
-        if (profilIdx !== -1) {
-          profiller[profilIdx].admin_onaylandi = false;
-          profiller[profilIdx].aktif = false;
-          savePsikologProfilleri(profiller);
-        }
-        return { ...b, durum: "reddedildi" as const };
-      }
-      return b;
-    });
-    setBekleyenler(guncel);
-    saveOnayBekleyenler(guncel);
-    setSuccessMsg(`${bekleyenler.find(b => b.id === id)?.ad} reddedildi.`);
-    setTimeout(() => setSuccessMsg(""), 3000);
-    onRefresh();
+  const handleReddet = async (id: string) => {
+    try {
+      await updateOnayDurumu(id, "reddedildi");
+      setSuccessMsg(`Psikolog reddedildi.`);
+      setTimeout(() => setSuccessMsg(""), 3000);
+      loadData();
+      onRefresh();
+    } catch (err) {
+      console.error("Reddetme hatası:", err);
+    }
   };
 
-  const filtered = bekleyenler.filter(b =>
+  const filtered = bekleyenler.filter((b: any) =>
     b.ad.toLowerCase().includes(searchTerm.toLowerCase()) ||
     b.alan.toLowerCase().includes(searchTerm.toLowerCase()) ||
     b.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const bekleyenSayisi = bekleyenler.filter(b => b.durum === "beklemede").length;
+  const bekleyenSayisi = bekleyenler.filter((b: any) => b.durum === "beklemede").length;
 
   return (
     <div>
@@ -314,7 +272,7 @@ function OnayBekleyenler({ onRefresh }: { onRefresh: () => void }) {
               <p className="text-sm text-calm-500 mt-1">Yeni kayıt olan psikologlar burada görünecek.</p>
             </div>
           ) : (
-            filtered.map((psikolog) => (
+            filtered.map((psikolog: any) => (
               <div
                 key={psikolog.id}
                 className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl gap-4 ${
@@ -342,12 +300,6 @@ function OnayBekleyenler({ onRefresh }: { onRefresh: () => void }) {
                         <Mail className="h-3.5 w-3.5" />
                         {psikolog.email}
                       </span>
-                      {psikolog.telefon && (
-                        <span className="flex items-center gap-1">
-                          <Phone className="h-3.5 w-3.5" />
-                          {psikolog.telefon}
-                        </span>
-                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
                       <span className="inline-flex items-center rounded-full bg-primary-100 px-2.5 py-0.5 text-xs font-medium text-primary-700">
@@ -355,7 +307,7 @@ function OnayBekleyenler({ onRefresh }: { onRefresh: () => void }) {
                       </span>
                       <span className="text-xs text-calm-400">
                         <Calendar className="h-3 w-3 inline mr-1" />
-                        {psikolog.basvuru}
+                        {new Date(psikolog.created_at).toLocaleDateString("tr-TR")}
                       </span>
                     </div>
                   </div>
@@ -402,11 +354,15 @@ function OnayBekleyenler({ onRefresh }: { onRefresh: () => void }) {
 }
 
 function PsikologListesi() {
-  const tumPsikologlar = getTumPsikologlar();
+  const [tumPsikologlar, setTumPsikologlar] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
+  useEffect(() => {
+    getPsikologProfilleri().then(setTumPsikologlar).catch(console.error);
+  }, []);
+
   const psikologlar = tumPsikologlar
-    .filter(p => 
+    .filter((p: any) => 
       p.unvan.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.sehir.toLowerCase().includes(searchTerm.toLowerCase())
     )
@@ -455,7 +411,7 @@ function PsikologListesi() {
               </tr>
             </thead>
             <tbody>
-              {psikologlar.map((p) => (
+              {psikologlar.map((p: any) => (
                 <tr key={p.id} className="border-b border-gray-100 last:border-0 hover:bg-calm-50 transition-colors">
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
@@ -520,22 +476,13 @@ function PsikologListesi() {
 }
 
 function OdemeTakibi() {
-  const [odemeler, setOdemeler] = useState<Odeme[]>([]);
-
-  useEffect(() => {
-    let data = getOdemeler();
-    if (data.length === 0) {
-      data = [
-        { id: 1, psikolog: "Uzm. Klinik Psikolog Ayşe Yılmaz", paket: "Premium", tutar: "599 TL", tarih: "15 Mayıs 2026", durum: "basarili" },
-        { id: 2, psikolog: "Uzm. Psikolog Mehmet Demir", paket: "Temel", tutar: "299 TL", tarih: "14 Mayıs 2026", durum: "basarili" },
-        { id: 3, psikolog: "Çocuk ve Ergen Psikoloğu Zeynep Kaya", paket: "Premium", tutar: "599 TL", tarih: "10 Mayıs 2026", durum: "basarili" },
-        { id: 4, psikolog: "Klinik Psikolog Canan Şahin", paket: "Öne Çıkan", tutar: "449 TL", tarih: "8 Mayıs 2026", durum: "basarili" },
-        { id: 5, psikolog: "Uzm. Psikolog Ali Yıldız", paket: "Temel", tutar: "299 TL", tarih: "5 Mayıs 2026", durum: "basarisiz" },
-      ];
-      saveOdemeler(data);
-    }
-    setOdemeler(data);
-  }, []);
+  const [odemeler] = useState<any[]>([
+    { id: 1, psikolog: "Uzm. Klinik Psikolog Ayşe Yılmaz", paket: "Premium", tutar: "599 TL", tarih: "15 Mayıs 2026", durum: "basarili" },
+    { id: 2, psikolog: "Uzm. Psikolog Mehmet Demir", paket: "Temel", tutar: "299 TL", tarih: "14 Mayıs 2026", durum: "basarili" },
+    { id: 3, psikolog: "Çocuk ve Ergen Psikoloğu Zeynep Kaya", paket: "Premium", tutar: "599 TL", tarih: "10 Mayıs 2026", durum: "basarili" },
+    { id: 4, psikolog: "Klinik Psikolog Canan Şahin", paket: "Öne Çıkan", tutar: "449 TL", tarih: "8 Mayıs 2026", durum: "basarili" },
+    { id: 5, psikolog: "Uzm. Psikolog Ali Yıldız", paket: "Temel", tutar: "299 TL", tarih: "5 Mayıs 2026", durum: "basarisiz" },
+  ]);
 
   const toplamGelir = odemeler
     .filter(o => o.durum === "basarili")
@@ -564,7 +511,7 @@ function OdemeTakibi() {
               </tr>
             </thead>
             <tbody>
-              {odemeler.map((o) => (
+              {odemeler.map((o: any) => (
                 <tr key={o.id} className="border-b border-gray-100 last:border-0">
                   <td className="py-3 px-4 font-medium text-calm-900">{o.psikolog}</td>
                   <td className="py-3 px-4">
@@ -594,7 +541,12 @@ function OdemeTakibi() {
 }
 
 function Raporlar() {
-  const tumPsikologlar = getTumPsikologlar();
+  const [tumPsikologlar, setTumPsikologlar] = useState<any[]>([]);
+
+  useEffect(() => {
+    getPsikologProfilleri().then(setTumPsikologlar).catch(console.error);
+  }, []);
+
   const aktifSayisi = tumPsikologlar.filter(p => p.aktif).length;
   const premiumSayisi = tumPsikologlar.filter(p => p.abonelik_paketi === "premium" || p.abonelik_paketi === "one-cikan").length;
 

@@ -361,6 +361,25 @@ export const MOCK_PSIKOLOGLAR: PsikologProfili[] = [
   },
 ];
 
+// getTumPsikologlar - Önce Supabase'den veri çekmeyi dener, yoksa mock verileri döndürür
+// Hem sync hem async kullanım için: sync'te mock veriler, async'te Supabase verileri
+export function getTumPsikologlar(): PsikologProfili[] {
+  return MOCK_PSIKOLOGLAR;
+}
+
+export async function getTumPsikologlarAsync(): Promise<PsikologProfili[]> {
+  try {
+    const { getPsikologProfilleri } = await import("./supabase-queries");
+    const supabaseData = await getPsikologProfilleri();
+    if (supabaseData && supabaseData.length > 0) {
+      return supabaseData;
+    }
+  } catch (e) {
+    console.warn("Supabase'den veri alınamadı, mock veriler kullanılıyor:", e);
+  }
+  return MOCK_PSIKOLOGLAR;
+}
+
 export const MOCK_BLOG_YAZILARI: BlogYazi[] = [
   {
     id: "b1",

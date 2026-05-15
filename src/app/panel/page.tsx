@@ -37,9 +37,11 @@ import { formatTarih, formatPara, SEHIRLER, UZMANLIK_ALANLARI, TERAPI_YONTEMLERI
 import {
   getPsikologProfiliByKullaniciId,
   upsertPsikologProfili,
-  getAbonelik,
-  saveAbonelik,
-} from "@/lib/localData";
+  getPsikologAbonelik,
+  createAbonelik,
+  updateAbonelik,
+} from "@/lib/supabase-queries";
+import { supabase } from "@/lib/supabase";
 
 type PanelTab = "profil" | "randevular" | "yorumlar" | "abonelik" | "dokumanlar";
 
@@ -201,7 +203,7 @@ function ProfilDuzenle() {
   const loadProfile = async () => {
     if (!user?.id) return;
     try {
-      const profil = getPsikologProfiliByKullaniciId(user.id);
+      const profil = await getPsikologProfiliByKullaniciId(user.id);
       if (profil) {
         setForm({
           unvan: profil.unvan || "",
@@ -224,7 +226,7 @@ function ProfilDuzenle() {
   const handleSave = async () => {
     if (!user?.id) return;
     try {
-      upsertPsikologProfili({
+      await upsertPsikologProfili({
         kullanici_id: user.id,
         unvan: form.unvan,
         sehir: form.sehir,
@@ -616,21 +618,26 @@ function Abonelik() {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-
-  // localStorage'dan abonelik bilgisini al
-  const getSubscription = () => {
-    try {
-      const data = JSON.parse(localStorage.getItem("psikoterapin_abonelikler") || "{}");
-      return data[user?.id || ""] || null;
-    } catch { return null; }
-  };
-
-  const [activePaket, setActivePaket] = useState<string>(() => {
-    const sub = getSubscription();
-    return sub?.paket || "temel";
-  });
-
+  const [psikologProfili, setPsikologProfili] = useState<any>(null);
+  const [activePaket, setActivePaket] = useState<string>("temel");
   const [odemeYontemi, setOdemeYontemi] = useState("kredi-karti");
+
+  useEffect(() => {
+    loadAbonelik();
+  }, [user?.id]);
+
+  const loadAbonelik = async () => {
+    if (!user?.id) return;
+    try {
+      const profil = await getPsikologProfiliByKullaniciId(user.id);
+      setPsikologProfili(profil);
+      if (profil?.abonelik_paketi) {
+        setActivePaket(profil.abonelik_paketi);
+      }
+    } catch (err) {
+      console.error("Abonelik yüklenirken hata:", err);
+    }
+  };
 
   const paketler = [
     {
@@ -677,81 +684,89 @@ function Abonelik() {
     },
   ];
 
-  const handleSubscribe = (paketId: string) => {
-    if (paketId === activePaket) return;
+  const handleSubscribe = async (paketId: string) => {
+    if (paketId === activePaket || !user?.id) return;
     setLoading(true);
     setSuccessMsg("");
     setErrorMsg("");
 
-    // Ödeme simülasyonu
-    setTimeout(() => {
-      try {
-        // localStorage'a kaydet
-        const data = JSON.parse(localStorage.getItem("psikoterapin_abonelikler") || "{}");
-        data[user?.id || ""] = {
-          paket: paketId,
-          baslangic: new Date().toISOString(),
-          bitis: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 gün sonra
-          odeme_yontemi: odemeYontemi,
-          otomatik_yenile: true,
+    try {
+      // Psikolog profilini bul
+      const profil = await getPsikologProfiliByKullaniciId(user.id);
+      if (!profil) {
+        setErrorMsg("Psikolog profili bulunamadı.");
+        setLoading(false);
+        return;
+      }
+
+      // Mevcut aboneliği kontrol et
+      const mevcutAbonelik = await getPsikologAbonelik(profil.id);
+
+      if (mevcutAbonelik) {
+        // Aboneliği güncelle
+        await updateAbonelik(mevcutAbonelik.id, {
+          paket: paketId as any,
           durum: "aktif",
-        };
-        localStorage.setItem("psikoterapin_abonelikler", JSON.stringify(data));
-
-        // Psikolog profilini de güncelle (ana sayfada gösterilmesi için)
-        const profiller = JSON.parse(localStorage.getItem("psikoterapin_psikolog_profilleri") || "[]");
-        const idx = profiller.findIndex((p: any) => p.kullanici_id === user?.id);
-        if (idx !== -1) {
-          profiller[idx].abonelik_paketi = paketId;
-          profiller[idx].abonelik_durumu = "aktif";
-          profiller[idx].aktif = true;
-          localStorage.setItem("psikoterapin_psikolog_profilleri", JSON.stringify(profiller));
-        }
-        
-        // Ayrıca getTumPsikologlar()'ın okuyacağı abonelikler key'ini de güncelle
-        const abonelikler = JSON.parse(localStorage.getItem("psikoterapin_abonelikler") || "{}");
-        if (abonelikler[user?.id || ""]) {
-          abonelikler[user?.id || ""].paket = paketId;
-          abonelikler[user?.id || ""].durum = "aktif";
-          localStorage.setItem("psikoterapin_abonelikler", JSON.stringify(abonelikler));
-        }
-
-
-        setActivePaket(paketId);
-        setSuccessMsg(`${paketler.find(p => p.id === paketId)?.ad} paketine başarıyla geçtiniz!`);
-      } catch (err) {
-        setErrorMsg("Abonelik güncellenirken bir hata oluştu.");
+          bitis_tarihi: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          ucret: paketler.find(p => p.id === paketId)?.fiyat || 299,
+        });
+      } else {
+        // Yeni abonelik oluştur
+        await createAbonelik({
+          psikolog_id: profil.id,
+          paket: paketId as any,
+          durum: "aktif",
+          baslangic_tarihi: new Date().toISOString(),
+          bitis_tarihi: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          otomatik_yenile: true,
+          ucret: paketler.find(p => p.id === paketId)?.fiyat || 299,
+        });
       }
-      setLoading(false);
-    }, 1500);
+
+      // Psikolog profilini güncelle
+      await upsertPsikologProfili({
+        kullanici_id: user.id,
+        abonelik_paketi: paketId as any,
+        abonelik_durumu: "aktif",
+        aktif: true,
+      });
+
+      setActivePaket(paketId);
+      setSuccessMsg(`${paketler.find(p => p.id === paketId)?.ad} paketine başarıyla geçtiniz!`);
+    } catch (err) {
+      setErrorMsg("Abonelik güncellenirken bir hata oluştu.");
+      console.error(err);
+    }
+    setLoading(false);
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
+    if (!user?.id) return;
     setLoading(true);
-    setTimeout(() => {
-      try {
-        const data = JSON.parse(localStorage.getItem("psikoterapin_abonelikler") || "{}");
-        if (data[user?.id || ""]) {
-          data[user?.id || ""].durum = "iptal-edildi";
-          data[user?.id || ""].otomatik_yenile = false;
-          localStorage.setItem("psikoterapin_abonelikler", JSON.stringify(data));
+    try {
+      const profil = await getPsikologProfiliByKullaniciId(user.id);
+      if (profil) {
+        const mevcutAbonelik = await getPsikologAbonelik(profil.id);
+        if (mevcutAbonelik) {
+          await updateAbonelik(mevcutAbonelik.id, {
+            durum: "pasif",
+            otomatik_yenile: false,
+          });
         }
-        setSuccessMsg("Aboneliğiniz iptal edildi. Dönem sonuna kadar hizmet almaya devam edebilirsiniz.");
-      } catch (err) {
-        setErrorMsg("İptal işlemi sırasında bir hata oluştu.");
       }
-      setLoading(false);
-    }, 1000);
+      setSuccessMsg("Aboneliğiniz iptal edildi. Dönem sonuna kadar hizmet almaya devam edebilirsiniz.");
+    } catch (err) {
+      setErrorMsg("İptal işlemi sırasında bir hata oluştu.");
+    }
+    setLoading(false);
   };
 
-  const sub = getSubscription();
-  const bitisTarihi = sub?.bitis ? new Date(sub.bitis).toLocaleDateString("tr-TR") : null;
   const aktifPaketBilgi = paketler.find(p => p.id === activePaket);
 
   return (
     <div className="max-w-5xl">
       {/* Aktif Abonelik Bilgisi */}
-      {sub && sub.durum === "aktif" && (
+      {psikologProfili?.abonelik_durumu === "aktif" && (
         <div className="card bg-gradient-to-r from-primary-50 to-primary-100/50 border border-primary-200 mb-8">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-4">
@@ -763,18 +778,13 @@ function Abonelik() {
                   {aktifPaketBilgi?.ad} Paketi Aktif
                 </h3>
                 <p className="text-sm text-calm-500 mt-1">
-                  {bitisTarihi ? `Bitiş tarihi: ${bitisTarihi}` : "Süresiz"}
+                  {psikologProfili?.abonelik_paketi === "premium" ? "Premium" : psikologProfili?.abonelik_paketi === "one-cikan" ? "Öne Çıkan" : "Temel"} paket
                 </p>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-0.5 text-xs font-medium text-green-700">
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Aktif
                   </span>
-                  {sub.otomatik_yenile && (
-                    <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-0.5 text-xs font-medium text-blue-700">
-                      Otomatik Yenileme Açık
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
@@ -908,17 +918,17 @@ function Abonelik() {
       <div className="mt-8">
         <h3 className="text-lg font-semibold text-calm-900 mb-4">Ödeme Geçmişi</h3>
         <div className="card">
-          {sub ? (
+          {psikologProfili?.abonelik_durumu === "aktif" ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 rounded-xl bg-calm-50">
                 <div className="flex items-center gap-3">
                   <CreditCard className="h-8 w-8 text-primary-400" />
                   <div>
                     <p className="text-sm font-medium text-calm-900">
-                      {aktifPaketBilgi?.ad} Paketi - {sub.odeme_yontemi === "kredi-karti" ? "Kredi Kartı" : "Banka Havalesi"}
+                      {aktifPaketBilgi?.ad} Paketi - {odemeYontemi === "kredi-karti" ? "Kredi Kartı" : "Banka Havalesi"}
                     </p>
                     <p className="text-xs text-calm-400">
-                      {new Date(sub.baslangic).toLocaleDateString("tr-TR")} • {aktifPaketBilgi?.fiyat} TL
+                      {new Date().toLocaleDateString("tr-TR")} • {aktifPaketBilgi?.fiyat} TL
                     </p>
                   </div>
                 </div>

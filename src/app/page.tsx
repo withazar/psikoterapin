@@ -15,8 +15,7 @@ import {
   MessageCircle,
   Calendar,
 } from "lucide-react";
-import { MOCK_BLOG_YAZILARI } from "@/lib/data";
-import { getTumPsikologlar } from "@/lib/localData";
+import { MOCK_BLOG_YAZILARI, getTumPsikologlar } from "@/lib/data";
 import PsikologKarti from "@/components/PsikologKarti";
 import { formatPara } from "@/lib/utils";
 

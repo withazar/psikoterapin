@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { Randevu, RandevuDurumu } from "@/types";
+import { supabase } from "@/lib/supabase";
 
 interface RandevuContextType {
   randevular: Randevu[];
@@ -18,37 +19,19 @@ interface RandevuContextType {
 
 const RandevuContext = createContext<RandevuContextType | undefined>(undefined);
 
-// LocalStorage yardımcıları
-function getLocalRandevular(): Randevu[] {
-  try {
-    // Önce yeni key'i dene
-    let data = localStorage.getItem("psikoterapin_randevular");
-    if (!data) {
-      // Eski key'den taşı
-      data = localStorage.getItem("psikobul_randevular");
-      if (data) {
-        localStorage.setItem("psikoterapin_randevular", data);
-        localStorage.removeItem("psikobul_randevular");
-      }
-    }
-    if (!data) return [];
-    const parsed = JSON.parse(data);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
-}
-
-function saveLocalRandevular(randevular: Randevu[]) {
-  localStorage.setItem("psikoterapin_randevular", JSON.stringify(randevular));
-}
-
 export function RandevuProvider({ children }: { children: React.ReactNode }) {
   const [randevular, setRandevular] = useState<Randevu[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refreshRandevular = useCallback(async () => {
     try {
-      const data = getLocalRandevular();
-      setRandevular(data);
+      const { data, error } = await supabase
+        .from("randevular")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setRandevular(data as Randevu[]);
     } catch (err) {
       console.error("Randevu yükleme hatası:", err);
     }
@@ -61,21 +44,23 @@ export function RandevuProvider({ children }: { children: React.ReactNode }) {
 
   const randevuAl = useCallback(async (data: Omit<Randevu, "id" | "created_at" | "updated_at" | "durum" | "odeme_yapildi">) => {
     try {
-      const yeniRandevu: Randevu = {
-        ...data,
-        id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
-        durum: "bekliyor",
-        odeme_yapildi: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      const { data: yeniRandevu, error } = await supabase
+        .from("randevular")
+        .insert({
+          ...data,
+          durum: "bekliyor",
+          odeme_yapildi: false,
+        })
+        .select()
+        .single();
 
-      const mevcut = getLocalRandevular();
-      mevcut.unshift(yeniRandevu);
-      saveLocalRandevular(mevcut);
-      setRandevular(mevcut);
+      if (error) throw error;
 
-      return yeniRandevu;
+      if (yeniRandevu) {
+        setRandevular(prev => [yeniRandevu as Randevu, ...prev]);
+        return yeniRandevu as Randevu;
+      }
+      return null;
     } catch (err) {
       console.error("Randevu oluşturma hatası:", err);
       return null;
@@ -84,12 +69,16 @@ export function RandevuProvider({ children }: { children: React.ReactNode }) {
 
   const randevuOnayla = useCallback(async (id: string) => {
     try {
-      const mevcut = getLocalRandevular();
-      const guncel = mevcut.map((r) =>
-        r.id === id ? { ...r, durum: "onaylandi" as RandevuDurumu, updated_at: new Date().toISOString() } : r
+      const { error } = await supabase
+        .from("randevular")
+        .update({ durum: "onaylandi", updated_at: new Date().toISOString() })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setRandevular(prev =>
+        prev.map(r => (r.id === id ? { ...r, durum: "onaylandi" as RandevuDurumu, updated_at: new Date().toISOString() } : r))
       );
-      saveLocalRandevular(guncel);
-      setRandevular(guncel);
     } catch (err) {
       console.error("Randevu onaylama hatası:", err);
     }
@@ -97,12 +86,16 @@ export function RandevuProvider({ children }: { children: React.ReactNode }) {
 
   const randevuIptal = useCallback(async (id: string) => {
     try {
-      const mevcut = getLocalRandevular();
-      const guncel = mevcut.map((r) =>
-        r.id === id ? { ...r, durum: "iptal" as RandevuDurumu, updated_at: new Date().toISOString() } : r
+      const { error } = await supabase
+        .from("randevular")
+        .update({ durum: "iptal", updated_at: new Date().toISOString() })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setRandevular(prev =>
+        prev.map(r => (r.id === id ? { ...r, durum: "iptal" as RandevuDurumu, updated_at: new Date().toISOString() } : r))
       );
-      saveLocalRandevular(guncel);
-      setRandevular(guncel);
     } catch (err) {
       console.error("Randevu iptal hatası:", err);
     }
@@ -110,12 +103,16 @@ export function RandevuProvider({ children }: { children: React.ReactNode }) {
 
   const randevuTamamla = useCallback(async (id: string) => {
     try {
-      const mevcut = getLocalRandevular();
-      const guncel = mevcut.map((r) =>
-        r.id === id ? { ...r, durum: "tamamlandi" as RandevuDurumu, updated_at: new Date().toISOString() } : r
+      const { error } = await supabase
+        .from("randevular")
+        .update({ durum: "tamamlandi", updated_at: new Date().toISOString() })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setRandevular(prev =>
+        prev.map(r => (r.id === id ? { ...r, durum: "tamamlandi" as RandevuDurumu, updated_at: new Date().toISOString() } : r))
       );
-      saveLocalRandevular(guncel);
-      setRandevular(guncel);
     } catch (err) {
       console.error("Randevu tamamlama hatası:", err);
     }

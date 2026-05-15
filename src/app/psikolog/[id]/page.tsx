@@ -25,7 +25,7 @@ import {
   MessageSquare,
   Send,
 } from "lucide-react";
-import { getTumPsikologlar } from "@/lib/localData";
+import { getTumPsikologlar } from "@/lib/data";
 import { getPsikologYorumlari, createYorum, getPsikologRandevulari } from "@/lib/supabase-queries";
 
 import {
