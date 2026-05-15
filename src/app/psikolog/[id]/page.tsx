@@ -107,7 +107,7 @@ export default function PsikologDetayPage() {
     if (!user) return;
 
     randevuAl({
-      psikolog_id: psikolog.id,
+      psikolog_id: psikolog.kullanici_id,
       psikolog_ad: psikolog.unvan,
       danisan_id: user.id,
       danisan_ad: `${user.ad} ${user.soyad}`,
@@ -126,7 +126,7 @@ export default function PsikologDetayPage() {
     if (!user) return;
 
     randevuAl({
-      psikolog_id: psikolog.id,
+      psikolog_id: psikolog.kullanici_id,
       psikolog_ad: psikolog.unvan,
       danisan_id: user.id,
       danisan_ad: `${user.ad} ${user.soyad}`,

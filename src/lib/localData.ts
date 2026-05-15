@@ -97,6 +97,9 @@ export function getTumPsikologlar(): PsikologProfili[] {
   // Abonelik verilerini al
   const abonelikler = getAbonelikler();
   
+  // Admin onay bilgilerini al
+  const onayBekleyenler = getOnayBekleyenler();
+  
   // Her bir mock psikolog için localStorage'daki güncel bilgileri uygula
   return tumPsikologlar.map((mockPsk) => {
     // Kullanıcı ID'sine göre eşleştir
@@ -104,6 +107,9 @@ export function getTumPsikologlar(): PsikologProfili[] {
     
     // Abonelik bilgisini kontrol et
     const abonelik = abonelikler[mockPsk.kullanici_id];
+    
+    // Admin onay durumunu kontrol et
+    const onayDurumu = onayBekleyenler.find((b: any) => b.kullanici_id === mockPsk.kullanici_id);
     
     let updatedPsk = { ...mockPsk };
     
@@ -117,14 +123,31 @@ export function getTumPsikologlar(): PsikologProfili[] {
         terapi_yontemi: localProfil.terapi_yontemi || mockPsk.terapi_yontemi,
         seans_ucreti: localProfil.seans_ucreti || mockPsk.seans_ucreti,
         deneyim_yili: localProfil.deneyim_yili || mockPsk.deneyim_yili,
+        // Admin onay durumunu local profil'den al
+        admin_onaylandi: localProfil.admin_onaylandi !== undefined ? localProfil.admin_onaylandi : mockPsk.admin_onaylandi,
+        aktif: localProfil.aktif !== undefined ? localProfil.aktif : mockPsk.aktif,
       };
+    }
+    
+    // Admin onay durumunu onay bekleyenlerden de kontrol et
+    if (onayDurumu) {
+      if (onayDurumu.durum === "onaylandi") {
+        updatedPsk.admin_onaylandi = true;
+        updatedPsk.aktif = true;
+      } else if (onayDurumu.durum === "reddedildi") {
+        updatedPsk.admin_onaylandi = false;
+        updatedPsk.aktif = false;
+      }
     }
     
     // Abonelik bilgisini uygula (localStorage'daki abonelik önceliklidir)
     if (abonelik) {
       updatedPsk.abonelik_paketi = abonelik.paket || updatedPsk.abonelik_paketi;
       updatedPsk.abonelik_durumu = abonelik.durum || updatedPsk.abonelik_durumu;
-      updatedPsk.aktif = abonelik.durum === "aktif";
+      // Abonelik aktifse ve admin onayladıysa aktif et
+      if (abonelik.durum === "aktif" && updatedPsk.admin_onaylandi !== false) {
+        updatedPsk.aktif = true;
+      }
     } else {
       // Abonelik yoksa mock'taki bilgiyi kullan
       updatedPsk.aktif = mockPsk.aktif !== undefined ? mockPsk.aktif : true;
@@ -133,6 +156,7 @@ export function getTumPsikologlar(): PsikologProfili[] {
     return updatedPsk;
   });
 }
+
 
 
 // ========== ABONELİKLER ==========

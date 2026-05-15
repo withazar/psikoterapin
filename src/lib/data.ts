@@ -3,7 +3,7 @@ import { PsikologProfili, BlogYazi } from "@/types";
 export const MOCK_PSIKOLOGLAR: PsikologProfili[] = [
   {
     id: "1",
-    kullanici_id: "u1",
+    kullanici_id: "psikolog-demo-001",
     unvan: "Uzm. Klinik Psikolog Ayşe Yılmaz",
     hakkinda:
       "İstanbul Üniversitesi Psikoloji bölümü mezunuyum. 10 yılı aşkın süredir klinik psikoloji alanında çalışmaktayım. BDT ve EMDR terapilerinde uzmanlaştım. Danışanlarıma güvenli ve destekleyici bir ortam sunarak, onların kendi potansiyellerini keşfetmelerine yardımcı oluyorum. Özellikle anksiyete bozuklukları, depresyon ve travma sonrası stres bozukluğu alanlarında çalışmaktayım.",
@@ -71,7 +71,7 @@ export const MOCK_PSIKOLOGLAR: PsikologProfili[] = [
   },
   {
     id: "2",
-    kullanici_id: "u2",
+    kullanici_id: "psikolog-demo-002",
     unvan: "Uzm. Psikolog Mehmet Demir",
     hakkinda:
       "Cinsel terapi ve çift terapisi alanında uzmanlaşmış bir psikoloğum. Çiftlerin ve bireylerin ilişki ve cinsellikle ilgili sorunlarını aşmalarına yardımcı oluyorum. Güvenli ve yargısız bir ortamda, danışanlarımın en derin endişelerini paylaşabilecekleri bir alan sunuyorum. 8 yıllık deneyimimle yüzlerce çifte ve bireye destek oldum.",
@@ -129,7 +129,7 @@ export const MOCK_PSIKOLOGLAR: PsikologProfili[] = [
   },
   {
     id: "3",
-    kullanici_id: "u3",
+    kullanici_id: "psikolog-demo-003",
     unvan: "Çocuk ve Ergen Psikoloğu Zeynep Kaya",
     hakkinda:
       "Çocuk ve ergen psikolojisi alanında 6 yıllık deneyime sahibim. Oyun terapisi, sanat terapisi ve aile danışmanlığı yöntemleriyle çocukların ve gençlerin duygusal, sosyal ve akademik gelişimlerine destek oluyorum. 3-18 yaş aralığındaki çocuk ve ergenlerle çalışıyorum. Ayrıca ebeveyn danışmanlığı hizmeti de vermekteyim.",
@@ -188,7 +188,7 @@ export const MOCK_PSIKOLOGLAR: PsikologProfili[] = [
   },
   {
     id: "4",
-    kullanici_id: "u4",
+    kullanici_id: "psikolog-demo-004",
     unvan: "Klinik Psikolog Canan Şahin",
     hakkinda:
       "Travma sonrası stres bozukluğu, anksiyete ve panik atak konularında uzmanlaşmış bir klinik psikoloğum. EMDR terapisinde ileri düzey uygulayıcıyım. Danışanlarıma bilimsel temelli ve bütüncül bir yaklaşım sunuyorum. Online terapi ile Türkiye'nin her yerinden danışan kabul ediyorum.",
@@ -244,7 +244,7 @@ export const MOCK_PSIKOLOGLAR: PsikologProfili[] = [
   },
   {
     id: "5",
-    kullanici_id: "u5",
+    kullanici_id: "psikolog-demo-005",
     unvan: "Uzm. Psikolog Ali Yıldız",
     hakkinda:
       "Bağımlılık psikolojisi alanında uzmanlaşmış bir psikoloğum. Madde bağımlılığı, alkol bağımlılığı ve davranışsal bağımlılıklar (kumar, internet) konularında bireysel ve grup terapileri düzenliyorum. Yeşilay ile ortak çalışmalar yürütmekteyim. 12 yıllık deneyimimle yüzlerce danışanın bağımlılıkla mücadelesine destek oldum.",
@@ -302,7 +302,7 @@ export const MOCK_PSIKOLOGLAR: PsikologProfili[] = [
   },
   {
     id: "6",
-    kullanici_id: "u6",
+    kullanici_id: "psikolog-demo-006",
     unvan: "Nöropsikolog Elif Yıldırım",
     hakkinda:
       "Nöropsikoloji alanında doktora sahibiyim. Dikkat eksikliği, öğrenme güçlükleri, hafıza sorunları ve nörolojik hastalıklara bağlı psikolojik sorunlar üzerine çalışıyorum. Kapsamlı nöropsikolojik değerlendirme ve rehabilitasyon hizmeti sunuyorum. DEHB, otizm spektrum bozukluğu ve özgül öğrenme güçlüğü alanlarında uzmanlaştım.",

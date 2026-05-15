@@ -40,10 +40,11 @@ export default function HomePage() {
   const oneCikanPsikologlar = aktifPsikologlar.filter(
     (p: any) => p.abonelik_paketi === "one-cikan" || p.abonelik_paketi === "premium"
   );
-  // Popüler psikologlar: rozetlerinde "populer" olan aktif psikologlar
-  const populerPsikologlar = aktifPsikologlar.filter(
-    (p: any) => p.rozetler?.some((r: any) => r.tip === "populer")
-  );
+  // Popüler psikologlar: premium/one-cikan olanlar (öne çıkanlardan farklı olarak)
+  // Eğer öne çıkan yoksa, tüm aktif psikologları puan sırasına göre göster
+  const populerPsikologlar = oneCikanPsikologlar.length > 0
+    ? oneCikanPsikologlar
+    : [...aktifPsikologlar].sort((a: any, b: any) => (b.puan_ortalamasi || 0) - (a.puan_ortalamasi || 0));
   const sonBloglar = MOCK_BLOG_YAZILARI.slice(0, 3);
 
   return (

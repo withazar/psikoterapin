@@ -71,6 +71,7 @@ export interface PsikologProfili {
   puan_ortalamasi: number;
   yorum_sayisi: number;
   diploma_onayli: boolean;
+  admin_onaylandi?: boolean;
   profil_foto_url?: string;
   kapak_foto_url?: string;
   abonelik_durumu: AbonelikDurumu;

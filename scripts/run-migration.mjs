@@ -46,15 +46,24 @@ async function runMigration() {
   console.log("");
   console.log("========================================");
   console.log(sql);
-  console.log("========================================");
-  console.log("");
-  console.log("5. Ikinci migration'u da calistirin (e-posta dogrulamasi icin):");
-  console.log("");
-  console.log("========================================");
-  const migration2Path = join(__dirname, "..", "supabase", "migrations", "00002_disable_email_confirm.sql");
-  const sql2 = readFileSync(migration2Path, "utf-8");
-  console.log(sql2);
-  console.log("========================================");
+   console.log("========================================");
+   console.log("");
+   console.log("5. Ikinci migration'u da calistirin (e-posta dogrulamasi icin):");
+   console.log("");
+   console.log("========================================");
+   const migration2Path = join(__dirname, "..", "supabase", "migrations", "00002_disable_email_confirm.sql");
+   const sql2 = readFileSync(migration2Path, "utf-8");
+   console.log(sql2);
+   console.log("========================================");
+   console.log("");
+   console.log("6. Ucuncu migration'u da calistirin (yorumlar tablosu icin):");
+   console.log("");
+   console.log("========================================");
+   const migration3Path = join(__dirname, "..", "supabase", "migrations", "00003_yorumlar_tablosu.sql");
+   const sql3 = readFileSync(migration3Path, "utf-8");
+   console.log(sql3);
+   console.log("========================================");
+
 }
 
 runMigration().catch(console.error);
