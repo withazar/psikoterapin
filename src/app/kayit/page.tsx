@@ -38,13 +38,6 @@ export default function KayitPage() {
     telefon: "",
   });
 
-  // Sayfa yüklenirken localStorage'ı temizle (eski Supabase session'ları vs.)
-  useEffect(() => {
-    // Eski Supabase session'larını temizle
-    localStorage.removeItem("sb-mmutjipoztdcundcfabj-auth-token");
-    localStorage.removeItem("supabase.auth.token");
-  }, []);
-
   useEffect(() => {
     if (user) {
       router.push("/");
