@@ -278,7 +278,7 @@ function OnayBekleyenler() {
                       psikolog.durum === "onaylandi" ? "text-green-600" :
                       psikolog.durum === "reddedildi" ? "text-red-600" : "text-primary-600"
                     }`}>
-                      {psikolog.ad.split(" ").map(w => w[0]).join("")}
+                      {psikolog.ad.split(" ").map((w: string) => w[0]).join("")}
                     </span>
                   </div>
                   <div>
@@ -363,7 +363,7 @@ function PsikologListesi() {
                     <div className="flex items-center gap-2">
                       <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
                         <span className="text-xs font-bold text-primary-600">
-                          {p.ad.split(" ").map(w => w[0]).join("").slice(0, 2)}
+                          {p.ad.split(" ").map((w: string) => w[0]).join("").slice(0, 2)}
                         </span>
                       </div>
                       <span className="font-medium text-calm-900">{p.ad}</span>
