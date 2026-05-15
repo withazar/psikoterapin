@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Search, SlidersHorizontal, X, MapPin, Filter } from "lucide-react";
-import { getTumPsikologlar } from "@/lib/localData";
+import { getTumPsikologlar } from "@/lib/data";
 import PsikologKarti from "@/components/PsikologKarti";
 import {
   UZMANLIK_ALANLARI,

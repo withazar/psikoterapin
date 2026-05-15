@@ -18,7 +18,7 @@ import {
   MessageCircle,
   ChevronRight,
 } from "lucide-react";
-import { getTumPsikologlar } from "@/lib/localData";
+import { getTumPsikologlar } from "@/lib/data";
 import { formatPara, UZMANLIK_ALANLARI, TERAPI_YONTEMLERI } from "@/lib/utils";
 
 interface Soru {
