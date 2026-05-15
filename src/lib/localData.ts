@@ -100,32 +100,73 @@ export function getTumPsikologlar(): PsikologProfili[] {
   // Admin onay bilgilerini al
   const onayBekleyenler = getOnayBekleyenler();
   
-  // Her bir mock psikolog için localStorage'daki güncel bilgileri uygula
-  return tumPsikologlar.map((mockPsk) => {
+  // Mock psikolog ID'lerini topla (localStorage'daki profillerin mock'ta olup olmadığını kontrol etmek için)
+  const mockKullaniciIdleri = new Set(tumPsikologlar.map(p => p.kullanici_id));
+  
+  // localStorage'daki profillerden mock'ta olmayanları ekle (yeni kaydolan psikologlar)
+  for (const localProfil of localProfiller) {
+    if (!mockKullaniciIdleri.has(localProfil.kullanici_id)) {
+      // Mock'ta olmayan profil - yeni kaydolan psikolog
+      tumPsikologlar.push({
+        id: localProfil.id || localProfil.kullanici_id,
+        kullanici_id: localProfil.kullanici_id,
+        unvan: localProfil.unvan || "Psikolog",
+        hakkinda: localProfil.hakkinda || "",
+        uzmanlik_alani: localProfil.uzmanlik_alani || [],
+        terapi_yontemi: localProfil.terapi_yontemi || [],
+        terapi_tipi: localProfil.terapi_tipi || "yuz-yuze",
+        sehir: localProfil.sehir || "",
+        ilce: localProfil.ilce || "",
+        adres: localProfil.adres || "",
+        seans_ucreti: localProfil.seans_ucreti || 0,
+        online_ucret: localProfil.online_ucret || 0,
+        deneyim_yili: localProfil.deneyim_yili || 0,
+        egitim: localProfil.egitim || [],
+        sertifikalar: localProfil.sertifikalar || [],
+        rozetler: localProfil.rozetler || [{ id: `rozet-${localProfil.kullanici_id}`, tip: "yeni-uye", label: "Yeni Üye" }],
+        puan_ortalamasi: localProfil.puan_ortalamasi || 0,
+        yorum_sayisi: localProfil.yorum_sayisi || 0,
+        diploma_onayli: localProfil.diploma_onayli || false,
+        profil_foto_url: localProfil.profil_foto_url || "",
+        abonelik_durumu: localProfil.abonelik_durumu || "deneme",
+        abonelik_paketi: localProfil.abonelik_paketi || "temel",
+        ucretsiz_on_gorusme: localProfil.ucretsiz_on_gorusme || false,
+        aktif: localProfil.aktif !== undefined ? localProfil.aktif : false,
+        admin_onaylandi: localProfil.admin_onaylandi !== undefined ? localProfil.admin_onaylandi : false,
+        email: localProfil.email || "",
+        telefon: localProfil.telefon || "",
+        created_at: localProfil.created_at || new Date().toISOString(),
+        updated_at: localProfil.updated_at || new Date().toISOString(),
+      } as any);
+    }
+  }
+  
+  // Her bir psikolog için localStorage'daki güncel bilgileri uygula
+  return tumPsikologlar.map((psk) => {
     // Kullanıcı ID'sine göre eşleştir
-    const localProfil = localProfiller.find((lp: any) => lp.kullanici_id === mockPsk.kullanici_id);
+    const localProfil = localProfiller.find((lp: any) => lp.kullanici_id === psk.kullanici_id);
     
     // Abonelik bilgisini kontrol et
-    const abonelik = abonelikler[mockPsk.kullanici_id];
+    const abonelik = abonelikler[psk.kullanici_id];
     
     // Admin onay durumunu kontrol et
-    const onayDurumu = onayBekleyenler.find((b: any) => b.kullanici_id === mockPsk.kullanici_id);
+    const onayDurumu = onayBekleyenler.find((b: any) => b.kullanici_id === psk.kullanici_id);
     
-    let updatedPsk = { ...mockPsk };
+    let updatedPsk = { ...psk };
     
     if (localProfil) {
       updatedPsk = {
         ...updatedPsk,
-        unvan: localProfil.unvan || mockPsk.unvan,
-        hakkinda: localProfil.hakkinda || mockPsk.hakkinda,
-        sehir: localProfil.sehir || mockPsk.sehir,
-        uzmanlik_alani: localProfil.uzmanlik_alani || mockPsk.uzmanlik_alani,
-        terapi_yontemi: localProfil.terapi_yontemi || mockPsk.terapi_yontemi,
-        seans_ucreti: localProfil.seans_ucreti || mockPsk.seans_ucreti,
-        deneyim_yili: localProfil.deneyim_yili || mockPsk.deneyim_yili,
+        unvan: localProfil.unvan || psk.unvan,
+        hakkinda: localProfil.hakkinda || psk.hakkinda,
+        sehir: localProfil.sehir || psk.sehir,
+        uzmanlik_alani: localProfil.uzmanlik_alani || psk.uzmanlik_alani,
+        terapi_yontemi: localProfil.terapi_yontemi || psk.terapi_yontemi,
+        seans_ucreti: localProfil.seans_ucreti || psk.seans_ucreti,
+        deneyim_yili: localProfil.deneyim_yili || psk.deneyim_yili,
         // Admin onay durumunu local profil'den al
-        admin_onaylandi: localProfil.admin_onaylandi !== undefined ? localProfil.admin_onaylandi : mockPsk.admin_onaylandi,
-        aktif: localProfil.aktif !== undefined ? localProfil.aktif : mockPsk.aktif,
+        admin_onaylandi: localProfil.admin_onaylandi !== undefined ? localProfil.admin_onaylandi : psk.admin_onaylandi,
+        aktif: localProfil.aktif !== undefined ? localProfil.aktif : psk.aktif,
       };
     }
     
@@ -150,7 +191,7 @@ export function getTumPsikologlar(): PsikologProfili[] {
       }
     } else {
       // Abonelik yoksa mock'taki bilgiyi kullan
-      updatedPsk.aktif = mockPsk.aktif !== undefined ? mockPsk.aktif : true;
+      updatedPsk.aktif = psk.aktif !== undefined ? psk.aktif : true;
     }
     
     return updatedPsk;
