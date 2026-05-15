@@ -41,7 +41,8 @@ import {
   createAbonelik,
   updateAbonelik,
 } from "@/lib/supabase-queries";
-import { supabase } from "@/lib/supabase";
+import { MOCK_PSIKOLOGLAR } from "@/lib/data";
+import type { PsikologProfili } from "@/types";
 
 type PanelTab = "profil" | "randevular" | "yorumlar" | "abonelik" | "dokumanlar";
 
@@ -184,7 +185,7 @@ function ProfilDuzenle() {
   const [form, setForm] = useState({
     unvan: "",
     sehir: "",
-    telefon: user?.telefon || "",
+    telefon: "",
     web: "",
     aciklama: "",
     egitim: "",
@@ -195,6 +196,7 @@ function ProfilDuzenle() {
   });
 
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadProfile();
@@ -202,25 +204,41 @@ function ProfilDuzenle() {
 
   const loadProfile = async () => {
     if (!user?.id) return;
+    setLoading(true);
     try {
-      const profil = await getPsikologProfiliByKullaniciId(user.id);
+      // Önce Supabase/localStorage'dan profil verisini al
+      let profil = await getPsikologProfiliByKullaniciId(user.id);
+      
+      // Bulunamazsa mock verilerden kullanici_id'ye göre eşleştir
+      if (!profil) {
+        profil = MOCK_PSIKOLOGLAR.find(p => p.kullanici_id === user.id) || null;
+      }
+
       if (profil) {
         setForm({
           unvan: profil.unvan || "",
           sehir: profil.sehir || "",
-          telefon: user.telefon || "",
+          telefon: user?.telefon || "",
           web: "",
           aciklama: profil.hakkinda || "",
           egitim: profil.egitim?.map((e: any) => `${e.okul_adi} - ${e.bolum}`).join("\n") || "",
-          deneyim: `${profil.deneyim_yili} yıl`,
+          deneyim: profil.deneyim_yili?.toString() || "0",
           uzmanlik: profil.uzmanlik_alani || [],
           yontemler: profil.terapi_yontemi || [],
           ucret: profil.seans_ucreti?.toString() || "",
         });
+      } else {
+        // Hiç profil yoksa, demo psikolog için varsayılan değerler ata
+        setForm(prev => ({
+          ...prev,
+          unvan: "Uzm. Psikolog",
+          telefon: user?.telefon || "",
+        }));
       }
     } catch (err) {
       console.error("Profil yüklenirken hata:", err);
     }
+    setLoading(false);
   };
 
   const handleSave = async () => {
@@ -233,8 +251,28 @@ function ProfilDuzenle() {
         hakkinda: form.aciklama,
         uzmanlik_alani: form.uzmanlik as any,
         terapi_yontemi: form.yontemler as any,
+        terapi_tipi: "her-ikisi",
         seans_ucreti: parseInt(form.ucret) || 0,
+        online_ucret: Math.round((parseInt(form.ucret) || 0) * 0.8),
         deneyim_yili: parseInt(form.deneyim) || 0,
+        egitim: form.egitim ? form.egitim.split("\n").filter(Boolean).map((line, i) => ({
+          id: `egitim-${i}`,
+          okul_adi: line.split("-")[0]?.trim() || line,
+          bolum: line.split("-")[1]?.trim() || "",
+          derece: "lisans",
+          baslangic_yili: new Date().getFullYear() - 5,
+          devam_ediyor: false,
+        })) : [],
+        sertifikalar: [],
+        rozetler: [{ id: `rozet-${user.id}`, tip: "yeni-uye", label: "Yeni Üye" }],
+        puan_ortalamasi: 0,
+        yorum_sayisi: 0,
+        diploma_onayli: false,
+        profil_foto_url: "",
+        abonelik_durumu: "deneme",
+        abonelik_paketi: "temel",
+        ucretsiz_on_gorusme: false,
+        aktif: true,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -246,6 +284,14 @@ function ProfilDuzenle() {
   const toggleArray = (arr: string[], val: string): string[] => {
     return arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val];
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin h-8 w-8 border-4 border-primary-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl">
@@ -353,7 +399,7 @@ function ProfilDuzenle() {
               />
             </div>
             <div>
-              <label className="label">Eğitim</label>
+              <label className="label">Eğitim (Her satıra bir eğitim, Örn: İstanbul Üniversitesi - Psikoloji)</label>
               <textarea
                 placeholder="Mezuniyet bilgileriniz, sertifikalarınız..."
                 value={form.egitim}
@@ -363,13 +409,14 @@ function ProfilDuzenle() {
               />
             </div>
             <div>
-              <label className="label">Deneyim</label>
-              <textarea
-                placeholder="Çalışma deneyimleriniz..."
+              <label className="label">Deneyim (Yıl)</label>
+              <input
+                type="number"
+                placeholder="0"
                 value={form.deneyim}
                 onChange={(e) => setForm({ ...form, deneyim: e.target.value })}
-                rows={3}
-                className="input-field resize-none"
+                className="input-field"
+                min={0}
               />
             </div>
           </div>
@@ -629,7 +676,14 @@ function Abonelik() {
   const loadAbonelik = async () => {
     if (!user?.id) return;
     try {
-      const profil = await getPsikologProfiliByKullaniciId(user.id);
+      // Önce Supabase/localStorage'dan profil verisini al
+      let profil = await getPsikologProfiliByKullaniciId(user.id);
+      
+      // Bulunamazsa mock verilerden kullanici_id'ye göre eşleştir
+      if (!profil) {
+        profil = MOCK_PSIKOLOGLAR.find(p => p.kullanici_id === user.id) || null;
+      }
+      
       setPsikologProfili(profil);
       if (profil?.abonelik_paketi) {
         setActivePaket(profil.abonelik_paketi);
@@ -692,9 +746,13 @@ function Abonelik() {
 
     try {
       // Psikolog profilini bul
-      const profil = await getPsikologProfiliByKullaniciId(user.id);
+      let profil = await getPsikologProfiliByKullaniciId(user.id);
       if (!profil) {
-        setErrorMsg("Psikolog profili bulunamadı.");
+        profil = MOCK_PSIKOLOGLAR.find(p => p.kullanici_id === user.id) || null;
+      }
+      
+      if (!profil) {
+        setErrorMsg("Psikolog profili bulunamadı. Lütfen önce profil sayfasından profilinizi oluşturun.");
         setLoading(false);
         return;
       }
@@ -703,7 +761,6 @@ function Abonelik() {
       const mevcutAbonelik = await getPsikologAbonelik(profil.id);
 
       if (mevcutAbonelik) {
-        // Aboneliği güncelle
         await updateAbonelik(mevcutAbonelik.id, {
           paket: paketId as any,
           durum: "aktif",
@@ -711,7 +768,6 @@ function Abonelik() {
           ucret: paketler.find(p => p.id === paketId)?.fiyat || 299,
         });
       } else {
-        // Yeni abonelik oluştur
         await createAbonelik({
           psikolog_id: profil.id,
           paket: paketId as any,
@@ -744,7 +800,10 @@ function Abonelik() {
     if (!user?.id) return;
     setLoading(true);
     try {
-      const profil = await getPsikologProfiliByKullaniciId(user.id);
+      let profil = await getPsikologProfiliByKullaniciId(user.id);
+      if (!profil) {
+        profil = MOCK_PSIKOLOGLAR.find(p => p.kullanici_id === user.id) || null;
+      }
       if (profil) {
         const mevcutAbonelik = await getPsikologAbonelik(profil.id);
         if (mevcutAbonelik) {
