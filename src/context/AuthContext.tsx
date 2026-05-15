@@ -3,6 +3,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { User, UserRole } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { upsertPsikologProfili, saveOnayBekleyenler, getOnayBekleyenler } from "@/lib/localData";
+import { UZMANLIK_ALANLARI } from "@/lib/utils";
+
 
 interface AuthContextType {
   user: User | null;
@@ -334,11 +337,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userWithoutPassword);
       saveLocalSession(userWithoutPassword);
 
+      // Eğer psikolog kaydı ise, onay bekleyenlere ekle ve profil oluştur
+      if (data.rol === "psikolog") {
+        try {
+          // Psikolog profili oluştur
+          upsertPsikologProfili({
+            kullanici_id: newUser.id,
+            unvan: `Uzm. Psk. ${data.ad} ${data.soyad}`,
+            hakkinda: "",
+            uzmanlik_alani: [],
+            terapi_yontemi: [],
+            terapi_tipi: "yuz-yuze",
+            sehir: "",
+            seans_ucreti: 500,
+            deneyim_yili: 0,
+            egitim: [],
+            sertifikalar: [],
+            rozetler: [{ id: `rozet-${newUser.id}`, tip: "yeni-uye", label: "Yeni Üye" }],
+            puan_ortalamasi: 0,
+            yorum_sayisi: 0,
+            diploma_onayli: false,
+            profil_foto_url: "",
+            abonelik_durumu: "deneme",
+            abonelik_paketi: "temel",
+            ucretsiz_on_gorusme: false,
+            aktif: false,
+            admin_onaylandi: false,
+            email: data.email,
+            telefon: data.telefon || "",
+          });
+
+          // Onay bekleyenlere ekle
+          const bekleyenler = getOnayBekleyenler();
+          bekleyenler.push({
+            id: `bekleyen-${newUser.id}`,
+            kullanici_id: newUser.id,
+            ad: `Uzm. Psk. ${data.ad} ${data.soyad}`,
+            email: data.email,
+            telefon: data.telefon || "",
+            alan: "Psikoloji",
+            basvuru: new Date().toLocaleDateString("tr-TR"),
+            durum: "beklemede",
+            profil: {
+              kullanici_id: newUser.id,
+              unvan: `Uzm. Psk. ${data.ad} ${data.soyad}`,
+              email: data.email,
+            },
+          });
+          saveOnayBekleyenler(bekleyenler);
+        } catch (e) {
+          console.error("Psikolog profili oluşturma hatası:", e);
+        }
+      }
+
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || "Kayıt olurken bir hata oluştu." };
     }
   }, []);
+
 
   const logout = useCallback(async () => {
     try {

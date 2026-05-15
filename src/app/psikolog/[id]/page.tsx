@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -21,8 +21,11 @@ import {
   X,
   AlertCircle,
   CheckCircle2,
+  ThumbsUp,
+  MessageSquare,
+  Send,
 } from "lucide-react";
-import { getTumPsikologlar } from "@/lib/localData";
+import { getTumPsikologlar, getRandevular } from "@/lib/localData";
 import {
   formatPara,
   formatTarih,
@@ -31,6 +34,8 @@ import {
 } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useRandevu } from "@/context/RandevuContext";
+import { Yorum } from "@/types";
+
 
 export default function PsikologDetayPage() {
   const router = useRouter();
@@ -370,7 +375,11 @@ export default function PsikologDetayPage() {
                 ))}
               </div>
             </div>
+
+            {/* Yorumlar */}
+            <YorumBolumu psikologId={psikolog.id} psikologAdi={psikolog.unvan} />
           </div>
+
 
           {/* Sidebar */}
           <div className="space-y-6">
@@ -558,3 +567,179 @@ export default function PsikologDetayPage() {
     </div>
   );
 }
+
+// ========== YORUM BÖLÜMÜ ==========
+
+function YorumBolumu({ psikologId, psikologAdi }: { psikologId: string; psikologAdi: string }) {
+  const { user } = useAuth();
+  const [yorumlar, setYorumlar] = useState<any[]>([]);
+  const [yorumMetni, setYorumMetni] = useState("");
+  const [puan, setPuan] = useState(5);
+  const [yorumYapiliyor, setYorumYapiliyor] = useState(false);
+  const [yorumYapabilir, setYorumYapabilir] = useState(false);
+  const [yorumYapildi, setYorumYapildi] = useState(false);
+
+  useEffect(() => {
+    // Yorumları yükle
+    const { getPsikologYorumlari, getRandevular } = require("@/lib/localData");
+    const psikologYorumlari = getPsikologYorumlari(psikologId);
+    setYorumlar(psikologYorumlari);
+
+    // Kullanıcı bu psikologdan terapi almış mı kontrol et
+    if (user) {
+      const randevular = getRandevular();
+      const tamamlananRandevu = randevular.find(
+        (r: any) => r.psikolog_id === psikologId && r.danisan_id === user.id && r.durum === "tamamlandi"
+      );
+      setYorumYapabilir(!!tamamlananRandevu);
+
+      // Daha önce yorum yapmış mı kontrol et
+      const oncekiYorum = psikologYorumlari.find((y: any) => y.danisan_id === user.id);
+      setYorumYapildi(!!oncekiYorum);
+    }
+  }, [psikologId, user]);
+
+  const handleYorumGonder = () => {
+    if (!user || !yorumMetni.trim()) return;
+    
+    const { yorumEkle } = require("@/lib/localData");
+    yorumEkle({
+      psikolog_id: psikologId,
+      danisan_id: user.id,
+      danisan_adi: `${user.ad} ${user.soyad}`,
+      puan: puan,
+      yorum: yorumMetni.trim(),
+    });
+
+    // Yorumları yeniden yükle
+    const { getPsikologYorumlari } = require("@/lib/localData");
+    setYorumlar(getPsikologYorumlari(psikologId));
+    setYorumMetni("");
+    setPuan(5);
+    setYorumYapildi(true);
+    setYorumYapiliyor(false);
+  };
+
+  return (
+    <div className="card">
+      <h2 className="text-lg font-semibold text-calm-900 mb-6 flex items-center gap-2">
+        <MessageSquare className="h-5 w-5 text-primary-500" />
+        Yorumlar ({yorumlar.length})
+      </h2>
+
+      {/* Yorum Ekle */}
+      {user && yorumYapabilir && !yorumYapildi && (
+        <div className="mb-6 p-4 rounded-xl bg-calm-50 border border-gray-200">
+          {yorumYapiliyor ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-calm-700">Puanın:</span>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((y) => (
+                    <button key={y} onClick={() => setPuan(y)}>
+                      <Star className={`h-5 w-5 ${y <= puan ? "text-amber-400 fill-amber-400" : "text-calm-300"}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <textarea
+                placeholder={`${psikologAdi} ile deneyiminizi paylaşın...`}
+                value={yorumMetni}
+                onChange={(e) => setYorumMetni(e.target.value)}
+                rows={3}
+                className="input-field resize-none"
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setYorumYapiliyor(false)}
+                  className="btn-secondary text-sm py-2 px-4"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleYorumGonder}
+                  disabled={!yorumMetni.trim()}
+                  className="btn-primary text-sm py-2 px-4 disabled:opacity-50"
+                >
+                  <Send className="h-4 w-4 mr-1.5" />
+                  Gönder
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setYorumYapiliyor(true)}
+              className="w-full text-left flex items-center gap-3 p-3 rounded-xl bg-white border-2 border-dashed border-gray-300 hover:border-primary-300 transition-colors"
+            >
+              <MessageCircle className="h-5 w-5 text-primary-400" />
+              <span className="text-sm text-calm-500">Deneyiminizi paylaşın, yorum yapın...</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Yorum yapamazsa bilgi mesajı */}
+      {user && !yorumYapabilir && !yorumYapildi && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200">
+          <p className="text-sm text-amber-700 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            Yorum yapabilmek için bu psikologdan terapi almanız gerekmektedir.
+          </p>
+        </div>
+      )}
+
+      {/* Yorum yapıldı mesajı */}
+      {user && yorumYapildi && (
+        <div className="mb-6 p-4 rounded-xl bg-green-50 border border-green-200">
+          <p className="text-sm text-green-700 flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 shrink-0" />
+            Bu psikolog için yorumunuzu paylaştınız.
+          </p>
+        </div>
+      )}
+
+      {/* Yorum Listesi */}
+      <div className="space-y-4">
+        {yorumlar.length === 0 ? (
+          <div className="text-center py-8">
+            <MessageSquare className="h-10 w-10 text-calm-300 mx-auto mb-3" />
+            <p className="text-sm text-calm-500">Henüz yorum yapılmamış.</p>
+            {!user && (
+              <Link href="/kayit" className="text-sm text-primary-600 hover:text-primary-700 font-medium mt-2 inline-block">
+                İlk yorumu sen yap
+              </Link>
+            )}
+          </div>
+        ) : (
+          yorumlar.map((yorum) => (
+            <div key={yorum.id} className="p-4 rounded-xl bg-calm-50">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
+                    <span className="text-xs font-bold text-primary-600">
+                      {yorum.danisan_adi?.charAt(0) || "?"}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-calm-900">{yorum.danisan_adi}</p>
+                    <p className="text-xs text-calm-400">
+                      {new Date(yorum.created_at).toLocaleDateString("tr-TR")}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-0.5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star key={i} className={`h-4 w-4 ${i < yorum.puan ? "text-amber-400 fill-amber-400" : "text-calm-300"}`} />
+                  ))}
+                </div>
+              </div>
+              <p className="text-sm text-calm-600">{yorum.yorum}</p>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+

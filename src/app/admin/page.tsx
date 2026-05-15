@@ -19,20 +19,32 @@ import {
   UserCheck,
   Eye,
   LogOut,
+  Star,
+  MapPin,
+  Video,
+  Sparkles,
+  Phone,
+  Mail,
+  Calendar,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useRandevu } from "@/context/RandevuContext";
-import { getTumPsikologlar } from "@/lib/localData";
+import { getTumPsikologlar, getPsikologProfilleri, savePsikologProfilleri, getOnayBekleyenler, saveOnayBekleyenler, getOdemeler, saveOdemeler } from "@/lib/localData";
+import { formatTarih, formatPara, UZMANLIK_ALANLARI } from "@/lib/utils";
 
 type TabId = "onay" | "psikologlar" | "odemeler" | "raporlar";
 
 interface BekleyenPsikolog {
   id: string;
+  kullanici_id: string;
   ad: string;
   email: string;
+  telefon: string;
   alan: string;
   basvuru: string;
   durum: "beklemede" | "onaylandi" | "reddedildi";
+  profil: any;
 }
 
 interface Odeme {
@@ -42,46 +54,6 @@ interface Odeme {
   tutar: string;
   tarih: string;
   durum: "basarili" | "basarisiz";
-}
-
-// ========== LOCALSTORAGE YARDIMCILARI ==========
-
-function getLocalOnayBekleyenler(): BekleyenPsikolog[] {
-  try {
-    return JSON.parse(localStorage.getItem("psikoterapin_onay_bekleyenler") || "[]");
-  } catch { return []; }
-}
-
-function saveLocalOnayBekleyenler(data: BekleyenPsikolog[]) {
-  localStorage.setItem("psikoterapin_onay_bekleyenler", JSON.stringify(data));
-}
-
-function getLocalOdemeler(): Odeme[] {
-  try {
-    return JSON.parse(localStorage.getItem("psikoterapin_odemeler") || "[]");
-  } catch { return []; }
-}
-
-function saveLocalOdemeler(data: Odeme[]) {
-  localStorage.setItem("psikoterapin_odemeler", JSON.stringify(data));
-}
-
-// Varsayılan onay bekleyen verileri
-function getDefaultOnayBekleyenler(): BekleyenPsikolog[] {
-  return [
-    { id: "b1", ad: "Dr. Mehmet Yılmaz", email: "mehmet@email.com", alan: "Klinik Psikoloji", basvuru: "12 Mayıs 2026", durum: "beklemede" },
-    { id: "b2", ad: "Uzm. Psk. Zeynep Kaya", email: "zeynep@email.com", alan: "Çocuk Psikolojisi", basvuru: "11 Mayıs 2026", durum: "beklemede" },
-    { id: "b3", ad: "Psk. Ali Demir", email: "ali@email.com", alan: "Cinsel Terapi", basvuru: "10 Mayıs 2026", durum: "beklemede" },
-  ];
-}
-
-// Varsayılan ödeme verileri
-function getDefaultOdemeler(): Odeme[] {
-  return [
-    { id: 1, psikolog: "Dr. Ayşe Demir", paket: "Premium", tutar: "599 TL", tarih: "15 Mayıs 2026", durum: "basarili" },
-    { id: 2, psikolog: "Uzm. Psk. Can Yıldız", paket: "Temel", tutar: "299 TL", tarih: "14 Mayıs 2026", durum: "basarili" },
-    { id: 3, psikolog: "Psk. Elif Su", paket: "Premium", tutar: "599 TL", tarih: "10 Mayıs 2026", durum: "basarisiz" },
-  ];
 }
 
 export default function AdminPage() {
@@ -114,13 +86,20 @@ export default function AdminPage() {
 
 function AdminPanel() {
   const [activeTab, setActiveTab] = useState<TabId>("onay");
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const tumPsikologlar = getTumPsikologlar();
+  const bekleyenler = getOnayBekleyenler();
+  const bekleyenSayisi = bekleyenler.filter((b: any) => b.durum === "beklemede").length;
 
   const tabs = [
-    { id: "onay" as TabId, label: "Onay Bekleyenler", icon: Clock },
+    { id: "onay" as TabId, label: "Onay Bekleyenler", icon: Clock, badge: bekleyenSayisi },
     { id: "psikologlar" as TabId, label: "Psikologlar", icon: Users },
     { id: "odemeler" as TabId, label: "Ödemeler", icon: CreditCard },
     { id: "raporlar" as TabId, label: "Raporlar", icon: BarChart3 },
   ];
+
+  const handleRefresh = () => setRefreshKey(k => k + 1);
 
   return (
     <div className="min-h-screen bg-calm-50">
@@ -149,9 +128,9 @@ function AdminPanel() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: "Toplam Psikolog", value: getTumPsikologlar().length.toString(), icon: Users, color: "text-blue-600 bg-blue-100" },
-              { label: "Onay Bekleyen", value: getLocalOnayBekleyenler().length > 0 ? getLocalOnayBekleyenler().filter(b => b.durum === "beklemede").length.toString() : "3", icon: Clock, color: "text-amber-600 bg-amber-100" },
-              { label: "Aktif Abonelik", value: getTumPsikologlar().filter(p => p.aktif).length.toString(), icon: CreditCard, color: "text-green-600 bg-green-100" },
+              { label: "Toplam Psikolog", value: tumPsikologlar.length.toString(), icon: Users, color: "text-blue-600 bg-blue-100" },
+              { label: "Onay Bekleyen", value: bekleyenSayisi.toString(), icon: Clock, color: "text-amber-600 bg-amber-100" },
+              { label: "Aktif Abonelik", value: tumPsikologlar.filter(p => p.aktif).length.toString(), icon: CreditCard, color: "text-green-600 bg-green-100" },
               { label: "Aylık Gelir", value: "53.211 TL", icon: DollarSign, color: "text-purple-600 bg-purple-100" },
             ].map((stat) => (
               <div key={stat.label} className="flex items-center gap-3 p-3 rounded-xl bg-calm-50">
@@ -184,6 +163,11 @@ function AdminPanel() {
               >
                 <tab.icon className="h-4 w-4" />
                 {tab.label}
+                {tab.badge !== undefined && tab.badge > 0 && (
+                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] rounded-full bg-red-500 text-white text-xs font-bold px-1">
+                    {tab.badge}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -192,61 +176,116 @@ function AdminPanel() {
 
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === "onay" && <OnayBekleyenler />}
-        {activeTab === "psikologlar" && <PsikologListesi />}
-        {activeTab === "odemeler" && <OdemeTakibi />}
-        {activeTab === "raporlar" && <Raporlar />}
+        {activeTab === "onay" && <OnayBekleyenler key={refreshKey} onRefresh={handleRefresh} />}
+        {activeTab === "psikologlar" && <PsikologListesi key={refreshKey} />}
+        {activeTab === "odemeler" && <OdemeTakibi key={refreshKey} />}
+        {activeTab === "raporlar" && <Raporlar key={refreshKey} />}
       </div>
     </div>
   );
 }
 
-function OnayBekleyenler() {
+function OnayBekleyenler({ onRefresh }: { onRefresh: () => void }) {
   const [bekleyenler, setBekleyenler] = useState<BekleyenPsikolog[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = () => {
-    // localStorage'dan verileri al
-    let data = getLocalOnayBekleyenler();
+    // localStorage'dan onay bekleyenleri al
+    let data = getOnayBekleyenler();
     
-    // Eğer localStorage boşsa varsayılan verileri ekle
+    // Eğer localStorage boşsa, psikolog profillerinden onay bekleyenleri oluştur
     if (data.length === 0) {
-      data = getDefaultOnayBekleyenler();
-      saveLocalOnayBekleyenler(data);
+      const profiller = getPsikologProfilleri();
+      // Henüz onaylanmamış profilleri onay bekleyenlere ekle
+      const onaylanmamis = profiller.filter((p: any) => !p.admin_onaylandi);
+      if (onaylanmamis.length > 0) {
+        data = onaylanmamis.map((p: any, i: number) => ({
+          id: `bekleyen-${i}`,
+          kullanici_id: p.kullanici_id,
+          ad: p.unvan || "İsimsiz Psikolog",
+          email: p.email || "",
+          telefon: p.telefon || "",
+          alan: Array.isArray(p.uzmanlik_alani) && p.uzmanlik_alani.length > 0
+            ? (UZMANLIK_ALANLARI[p.uzmanlik_alani[0]] || p.uzmanlik_alani[0])
+            : "Psikoloji",
+          basvuru: p.created_at ? new Date(p.created_at).toLocaleDateString("tr-TR") : new Date().toLocaleDateString("tr-TR"),
+          durum: "beklemede" as const,
+          profil: p,
+        }));
+        saveOnayBekleyenler(data);
+      }
     }
     
     setBekleyenler(data);
   };
 
   const handleOnayla = (id: string) => {
-    const guncel = bekleyenler.map(b => 
-      b.id === id ? { ...b, durum: "onaylandi" as const } : b
-    );
+    const guncel = bekleyenler.map(b => {
+      if (b.id === id) {
+        // Profili de güncelle - admin_onaylandi ekle
+        const profiller = getPsikologProfilleri();
+        const profilIdx = profiller.findIndex((p: any) => p.kullanici_id === b.kullanici_id);
+        if (profilIdx !== -1) {
+          profiller[profilIdx].admin_onaylandi = true;
+          profiller[profilIdx].aktif = true;
+          savePsikologProfilleri(profiller);
+        }
+        return { ...b, durum: "onaylandi" as const };
+      }
+      return b;
+    });
     setBekleyenler(guncel);
-    saveLocalOnayBekleyenler(guncel);
+    saveOnayBekleyenler(guncel);
+    setSuccessMsg(`${bekleyenler.find(b => b.id === id)?.ad} başarıyla onaylandı!`);
+    setTimeout(() => setSuccessMsg(""), 3000);
+    onRefresh();
   };
 
   const handleReddet = (id: string) => {
-    const guncel = bekleyenler.map(b => 
-      b.id === id ? { ...b, durum: "reddedildi" as const } : b
-    );
+    const guncel = bekleyenler.map(b => {
+      if (b.id === id) {
+        const profiller = getPsikologProfilleri();
+        const profilIdx = profiller.findIndex((p: any) => p.kullanici_id === b.kullanici_id);
+        if (profilIdx !== -1) {
+          profiller[profilIdx].admin_onaylandi = false;
+          profiller[profilIdx].aktif = false;
+          savePsikologProfilleri(profiller);
+        }
+        return { ...b, durum: "reddedildi" as const };
+      }
+      return b;
+    });
     setBekleyenler(guncel);
-    saveLocalOnayBekleyenler(guncel);
+    saveOnayBekleyenler(guncel);
+    setSuccessMsg(`${bekleyenler.find(b => b.id === id)?.ad} reddedildi.`);
+    setTimeout(() => setSuccessMsg(""), 3000);
+    onRefresh();
   };
 
   const filtered = bekleyenler.filter(b =>
     b.ad.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.alan.toLowerCase().includes(searchTerm.toLowerCase())
+    b.alan.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const bekleyenSayisi = bekleyenler.filter(b => b.durum === "beklemede").length;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold text-calm-900">Onay Bekleyen Psikologlar</h2>
+        <div>
+          <h2 className="text-lg font-semibold text-calm-900">Onay Bekleyen Psikologlar</h2>
+          <p className="text-sm text-calm-500 mt-1">
+            {bekleyenSayisi > 0
+              ? `${bekleyenSayisi} psikolog onay bekliyor`
+              : "Tüm başvurular işlenmiş"}
+          </p>
+        </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-calm-400" />
           <input
@@ -259,18 +298,33 @@ function OnayBekleyenler() {
         </div>
       </div>
 
+      {successMsg && (
+        <div className="flex items-center gap-2 p-4 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm mb-6">
+          <CheckCircle className="h-5 w-5 shrink-0" />
+          {successMsg}
+        </div>
+      )}
+
       <div className="card">
         <div className="space-y-4">
           {filtered.length === 0 ? (
-            <p className="text-center text-calm-500 py-8">Onay bekleyen psikolog bulunmuyor.</p>
+            <div className="text-center py-12">
+              <UserCheck className="h-12 w-12 text-calm-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-calm-900">Onay bekleyen psikolog bulunmuyor</h3>
+              <p className="text-sm text-calm-500 mt-1">Yeni kayıt olan psikologlar burada görünecek.</p>
+            </div>
           ) : (
             filtered.map((psikolog) => (
               <div
                 key={psikolog.id}
-                className="flex items-center justify-between p-4 rounded-xl bg-calm-50"
+                className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl gap-4 ${
+                  psikolog.durum === "onaylandi" ? "bg-green-50 border border-green-200" :
+                  psikolog.durum === "reddedildi" ? "bg-red-50 border border-red-200" :
+                  "bg-calm-50"
+                }`}
               >
-                <div className="flex items-center gap-4">
-                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                <div className="flex items-start gap-4 flex-1 min-w-0">
+                  <div className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 ${
                     psikolog.durum === "onaylandi" ? "bg-green-100" :
                     psikolog.durum === "reddedildi" ? "bg-red-100" : "bg-primary-100"
                   }`}>
@@ -278,28 +332,47 @@ function OnayBekleyenler() {
                       psikolog.durum === "onaylandi" ? "text-green-600" :
                       psikolog.durum === "reddedildi" ? "text-red-600" : "text-primary-600"
                     }`}>
-                      {psikolog.ad.split(" ").map((w: string) => w[0]).join("")}
+                      {psikolog.ad.split(" ").map((w: string) => w[0]).join("").slice(0, 2)}
                     </span>
                   </div>
-                  <div>
-                    <p className="font-medium text-calm-900">{psikolog.ad}</p>
-                    <p className="text-sm text-calm-500">{psikolog.alan} • {psikolog.basvuru}</p>
-                    <p className="text-xs text-calm-400">{psikolog.email}</p>
+                  <div className="min-w-0">
+                    <p className="font-medium text-calm-900 truncate">{psikolog.ad}</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-calm-500">
+                      <span className="flex items-center gap-1">
+                        <Mail className="h-3.5 w-3.5" />
+                        {psikolog.email}
+                      </span>
+                      {psikolog.telefon && (
+                        <span className="flex items-center gap-1">
+                          <Phone className="h-3.5 w-3.5" />
+                          {psikolog.telefon}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                      <span className="inline-flex items-center rounded-full bg-primary-100 px-2.5 py-0.5 text-xs font-medium text-primary-700">
+                        {psikolog.alan}
+                      </span>
+                      <span className="text-xs text-calm-400">
+                        <Calendar className="h-3 w-3 inline mr-1" />
+                        {psikolog.basvuru}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {psikolog.durum === "beklemede" ? (
                     <>
                       <button
                         onClick={() => handleOnayla(psikolog.id)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-green-100 px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-200 transition-colors"
+                        className="inline-flex items-center gap-1 rounded-lg bg-green-100 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-200 transition-colors"
                       >
                         <CheckCircle className="h-4 w-4" />
                         Onayla
                       </button>
                       <button
                         onClick={() => handleReddet(psikolog.id)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-200 transition-colors"
+                        className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-200 transition-colors"
                       >
                         <XCircle className="h-4 w-4" />
                         Reddet
@@ -330,19 +403,42 @@ function OnayBekleyenler() {
 
 function PsikologListesi() {
   const tumPsikologlar = getTumPsikologlar();
-  const psikologlar = tumPsikologlar.map((p: any) => ({
-    id: p.id,
-    ad: p.unvan,
-    alan: Array.isArray(p.uzmanlik_alani) ? p.uzmanlik_alani[0] : "",
-    paket: p.abonelik_paketi === "premium" ? "Premium" : p.abonelik_paketi === "one-cikan" ? "Öne Çıkan" : "Temel",
-    durum: p.aktif ? "aktif" as const : "suresi-dolmus" as const,
-    uyelik: p.aktif ? "Aktif" : "Süresi Doldu",
-  }));
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const psikologlar = tumPsikologlar
+    .filter(p => 
+      p.unvan.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.sehir.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .map((p: any) => ({
+      id: p.id,
+      ad: p.unvan,
+      sehir: p.sehir,
+      alan: Array.isArray(p.uzmanlik_alani) && p.uzmanlik_alani.length > 0
+        ? (UZMANLIK_ALANLARI[p.uzmanlik_alani[0]] || p.uzmanlik_alani[0])
+        : "",
+      puan: p.puan_ortalamasi,
+      yorum: p.yorum_sayisi,
+      ucret: p.seans_ucreti,
+      paket: p.abonelik_paketi === "premium" ? "Premium" : p.abonelik_paketi === "one-cikan" ? "Öne Çıkan" : "Temel",
+      aktif: p.aktif,
+      diploma_onayli: p.diploma_onayli,
+    }));
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold text-calm-900">Tüm Psikologlar</h2>
+        <h2 className="text-lg font-semibold text-calm-900">Tüm Psikologlar ({psikologlar.length})</h2>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-calm-400" />
+          <input
+            type="text"
+            placeholder="Psikolog veya şehir ara..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="input-field pl-9 py-2 text-sm w-64"
+          />
+        </div>
       </div>
       <div className="card">
         <div className="overflow-x-auto">
@@ -350,41 +446,69 @@ function PsikologListesi() {
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 font-medium text-calm-500">Psikolog</th>
+                <th className="text-left py-3 px-4 font-medium text-calm-500">Şehir</th>
                 <th className="text-left py-3 px-4 font-medium text-calm-500">Uzmanlık</th>
+                <th className="text-left py-3 px-4 font-medium text-calm-500">Puan</th>
+                <th className="text-left py-3 px-4 font-medium text-calm-500">Ücret</th>
                 <th className="text-left py-3 px-4 font-medium text-calm-500">Paket</th>
                 <th className="text-left py-3 px-4 font-medium text-calm-500">Durum</th>
-                <th className="text-left py-3 px-4 font-medium text-calm-500">Üyelik</th>
               </tr>
             </thead>
             <tbody>
               {psikologlar.map((p) => (
-                <tr key={p.id} className="border-b border-gray-100 last:border-0">
+                <tr key={p.id} className="border-b border-gray-100 last:border-0 hover:bg-calm-50 transition-colors">
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
+                      <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
                         <span className="text-xs font-bold text-primary-600">
                           {p.ad.split(" ").map((w: string) => w[0]).join("").slice(0, 2)}
                         </span>
                       </div>
-                      <span className="font-medium text-calm-900">{p.ad}</span>
+                      <div className="min-w-0">
+                        <span className="font-medium text-calm-900 truncate block">{p.ad}</span>
+                        {p.diploma_onayli && (
+                          <span className="text-xs text-green-600 flex items-center gap-0.5">
+                            <Shield className="h-3 w-3" /> Diploma Onaylı
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
+                  <td className="py-3 px-4 text-calm-500">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {p.sehir}
+                    </span>
+                  </td>
                   <td className="py-3 px-4 text-calm-500">{p.alan}</td>
+                  <td className="py-3 px-4">
+                    <span className="flex items-center gap-1 text-amber-600">
+                      <Star className="h-3.5 w-3.5 fill-current" />
+                      {p.puan}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 font-medium text-calm-900">{formatPara(p.ucret)}</td>
                   <td className="py-3 px-4">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                       p.paket === "Premium" || p.paket === "Öne Çıkan"
                         ? "bg-purple-100 text-purple-700"
                         : "bg-calm-100 text-calm-700"
-                    }`}>{p.paket}</span>
+                    }`}>
+                      {p.paket === "Öne Çıkan" && <Sparkles className="h-3 w-3 mr-1" />}
+                      {p.paket}
+                    </span>
                   </td>
                   <td className="py-3 px-4">
                     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      p.durum === "aktif" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                      p.aktif ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
                     }`}>
-                      {p.durum === "aktif" ? <><CheckCircle className="h-3 w-3" /> Aktif</> : <><AlertTriangle className="h-3 w-3" /> Süresi Doldu</>}
+                      {p.aktif ? (
+                        <><CheckCircle className="h-3 w-3" /> Aktif</>
+                      ) : (
+                        <><AlertTriangle className="h-3 w-3" /> Pasif</>
+                      )}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-calm-500">{p.uyelik}</td>
                 </tr>
               ))}
             </tbody>
@@ -399,17 +523,34 @@ function OdemeTakibi() {
   const [odemeler, setOdemeler] = useState<Odeme[]>([]);
 
   useEffect(() => {
-    let data = getLocalOdemeler();
+    let data = getOdemeler();
     if (data.length === 0) {
-      data = getDefaultOdemeler();
-      saveLocalOdemeler(data);
+      data = [
+        { id: 1, psikolog: "Uzm. Klinik Psikolog Ayşe Yılmaz", paket: "Premium", tutar: "599 TL", tarih: "15 Mayıs 2026", durum: "basarili" },
+        { id: 2, psikolog: "Uzm. Psikolog Mehmet Demir", paket: "Temel", tutar: "299 TL", tarih: "14 Mayıs 2026", durum: "basarili" },
+        { id: 3, psikolog: "Çocuk ve Ergen Psikoloğu Zeynep Kaya", paket: "Premium", tutar: "599 TL", tarih: "10 Mayıs 2026", durum: "basarili" },
+        { id: 4, psikolog: "Klinik Psikolog Canan Şahin", paket: "Öne Çıkan", tutar: "449 TL", tarih: "8 Mayıs 2026", durum: "basarili" },
+        { id: 5, psikolog: "Uzm. Psikolog Ali Yıldız", paket: "Temel", tutar: "299 TL", tarih: "5 Mayıs 2026", durum: "basarisiz" },
+      ];
+      saveOdemeler(data);
     }
     setOdemeler(data);
   }, []);
 
+  const toplamGelir = odemeler
+    .filter(o => o.durum === "basarili")
+    .reduce((sum, o) => sum + parseInt(o.tutar.replace(/[^0-9]/g, "")), 0);
+
   return (
     <div>
-      <h2 className="text-lg font-semibold text-calm-900 mb-6">Ödeme Takibi</h2>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-lg font-semibold text-calm-900">Ödeme Takibi</h2>
+          <p className="text-sm text-calm-500 mt-1">
+            Toplam gelir: <span className="font-semibold text-calm-900">{formatPara(toplamGelir)}</span>
+          </p>
+        </div>
+      </div>
       <div className="card">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -426,8 +567,14 @@ function OdemeTakibi() {
               {odemeler.map((o) => (
                 <tr key={o.id} className="border-b border-gray-100 last:border-0">
                   <td className="py-3 px-4 font-medium text-calm-900">{o.psikolog}</td>
-                  <td className="py-3 px-4 text-calm-500">{o.paket}</td>
-                  <td className="py-3 px-4 text-calm-900">{o.tutar}</td>
+                  <td className="py-3 px-4">
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      o.paket === "Premium" || o.paket === "Öne Çıkan"
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-calm-100 text-calm-700"
+                    }`}>{o.paket}</span>
+                  </td>
+                  <td className="py-3 px-4 text-calm-900 font-medium">{o.tutar}</td>
                   <td className="py-3 px-4 text-calm-500">{o.tarih}</td>
                   <td className="py-3 px-4">
                     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -447,6 +594,10 @@ function OdemeTakibi() {
 }
 
 function Raporlar() {
+  const tumPsikologlar = getTumPsikologlar();
+  const aktifSayisi = tumPsikologlar.filter(p => p.aktif).length;
+  const premiumSayisi = tumPsikologlar.filter(p => p.abonelik_paketi === "premium" || p.abonelik_paketi === "one-cikan").length;
+
   return (
     <div>
       <h2 className="text-lg font-semibold text-calm-900 mb-6">Raporlar</h2>
@@ -455,10 +606,10 @@ function Raporlar() {
           <h3 className="font-semibold text-calm-900 mb-4">Aylık İstatistikler</h3>
           <div className="space-y-3">
             {[
-              { label: "Yeni Kayıt", value: "18" },
-              { label: "Aktif Profil", value: getTumPsikologlar().filter((p: any) => p.aktif).length.toString() },
-              { label: "Toplam Randevu", value: "234" },
-              { label: "İptal Oranı", value: "%8" },
+              { label: "Toplam Psikolog", value: tumPsikologlar.length.toString() },
+              { label: "Aktif Profil", value: aktifSayisi.toString() },
+              { label: "Premium Üye", value: premiumSayisi.toString() },
+              { label: "Temel Paket", value: (tumPsikologlar.length - premiumSayisi).toString() },
             ].map((item) => (
               <div key={item.label} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
                 <span className="text-sm text-calm-500">{item.label}</span>
@@ -475,6 +626,7 @@ function Raporlar() {
               { alan: "Cinsel Terapi", yuzde: 72 },
               { alan: "Çift Terapisi", yuzde: 68 },
               { alan: "Depresyon", yuzde: 55 },
+              { alan: "Çocuk Psikolojisi", yuzde: 50 },
             ].map((item) => (
               <div key={item.alan}>
                 <div className="flex justify-between text-sm mb-1">

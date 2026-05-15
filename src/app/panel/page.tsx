@@ -707,6 +707,15 @@ function Abonelik() {
           profiller[idx].aktif = true;
           localStorage.setItem("psikoterapin_psikolog_profilleri", JSON.stringify(profiller));
         }
+        
+        // Ayrıca getTumPsikologlar()'ın okuyacağı abonelikler key'ini de güncelle
+        const abonelikler = JSON.parse(localStorage.getItem("psikoterapin_abonelikler") || "{}");
+        if (abonelikler[user?.id || ""]) {
+          abonelikler[user?.id || ""].paket = paketId;
+          abonelikler[user?.id || ""].durum = "aktif";
+          localStorage.setItem("psikoterapin_abonelikler", JSON.stringify(abonelikler));
+        }
+
 
         setActivePaket(paketId);
         setSuccessMsg(`${paketler.find(p => p.id === paketId)?.ad} paketine başarıyla geçtiniz!`);

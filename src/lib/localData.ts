@@ -94,13 +94,22 @@ export function getTumPsikologlar(): PsikologProfili[] {
   // localStorage'daki profilleri al
   const localProfiller = getPsikologProfilleri();
   
+  // Abonelik verilerini al
+  const abonelikler = getAbonelikler();
+  
   // Her bir mock psikolog için localStorage'daki güncel bilgileri uygula
   return tumPsikologlar.map((mockPsk) => {
     // Kullanıcı ID'sine göre eşleştir
     const localProfil = localProfiller.find((lp: any) => lp.kullanici_id === mockPsk.kullanici_id);
+    
+    // Abonelik bilgisini kontrol et
+    const abonelik = abonelikler[mockPsk.kullanici_id];
+    
+    let updatedPsk = { ...mockPsk };
+    
     if (localProfil) {
-      return {
-        ...mockPsk,
+      updatedPsk = {
+        ...updatedPsk,
         unvan: localProfil.unvan || mockPsk.unvan,
         hakkinda: localProfil.hakkinda || mockPsk.hakkinda,
         sehir: localProfil.sehir || mockPsk.sehir,
@@ -108,17 +117,23 @@ export function getTumPsikologlar(): PsikologProfili[] {
         terapi_yontemi: localProfil.terapi_yontemi || mockPsk.terapi_yontemi,
         seans_ucreti: localProfil.seans_ucreti || mockPsk.seans_ucreti,
         deneyim_yili: localProfil.deneyim_yili || mockPsk.deneyim_yili,
-        abonelik_paketi: localProfil.abonelik_paketi || mockPsk.abonelik_paketi,
-        abonelik_durumu: localProfil.abonelik_durumu || mockPsk.abonelik_durumu,
-        aktif: localProfil.aktif !== undefined ? localProfil.aktif : (mockPsk.aktif !== undefined ? mockPsk.aktif : true),
       };
     }
-    return {
-      ...mockPsk,
-      aktif: mockPsk.aktif !== undefined ? mockPsk.aktif : true,
-    };
+    
+    // Abonelik bilgisini uygula (localStorage'daki abonelik önceliklidir)
+    if (abonelik) {
+      updatedPsk.abonelik_paketi = abonelik.paket || updatedPsk.abonelik_paketi;
+      updatedPsk.abonelik_durumu = abonelik.durum || updatedPsk.abonelik_durumu;
+      updatedPsk.aktif = abonelik.durum === "aktif";
+    } else {
+      // Abonelik yoksa mock'taki bilgiyi kullan
+      updatedPsk.aktif = mockPsk.aktif !== undefined ? mockPsk.aktif : true;
+    }
+    
+    return updatedPsk;
   });
 }
+
 
 // ========== ABONELİKLER ==========
 
@@ -236,3 +251,60 @@ export function saveOdemeler(data: any[]) {
     console.error("Ödeme kaydetme hatası:", e);
   }
 }
+
+// ========== YORUMLAR ==========
+
+const STORAGE_KEY_YORUMLAR = "psikoterapin_yorumlar";
+
+export function getYorumlar(): any[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY_YORUMLAR) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function saveYorumlar(yorumlar: any[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY_YORUMLAR, JSON.stringify(yorumlar));
+  } catch (e) {
+    console.error("Yorum kaydetme hatası:", e);
+  }
+}
+
+export function getPsikologYorumlari(psikologId: string): any[] {
+  const yorumlar = getYorumlar();
+  return yorumlar.filter((y: any) => y.psikolog_id === psikologId && y.onayli);
+}
+
+export function yorumEkle(yorum: any) {
+  const yorumlar = getYorumlar();
+  yorumlar.push({
+    id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
+    ...yorum,
+    onayli: true,
+    created_at: new Date().toISOString(),
+  });
+  saveYorumlar(yorumlar);
+  
+  // Psikolog puanını güncelle
+  const psikologYorumlari = yorumlar.filter((y: any) => y.psikolog_id === yorum.psikolog_id && y.onayli);
+  const ortalamaPuan = psikologYorumlari.reduce((sum: number, y: any) => sum + y.puan, 0) / psikologYorumlari.length;
+  
+  const profiller = getPsikologProfilleri();
+  const profilIndex = profiller.findIndex((p: any) => p.kullanici_id === yorum.psikolog_id);
+  if (profilIndex !== -1) {
+    profiller[profilIndex].puan_ortalamasi = Math.round(ortalamaPuan * 10) / 10;
+    profiller[profilIndex].yorum_sayisi = psikologYorumlari.length;
+    savePsikologProfilleri(profiller);
+  }
+  
+  // Mock verilerdeki puanı da güncelle
+  const tumPsikologlar = getTumPsikologlar();
+  const mockIndex = tumPsikologlar.findIndex((p: any) => p.kullanici_id === yorum.psikolog_id);
+  if (mockIndex !== -1) {
+    // Mock veriler localStorage'da saklanmadığı için sadece local profiller güncellenir
+  }
+}
+
+
